@@ -17,6 +17,7 @@
 #include <linux/syscalls.h>
 #include <linux/vmalloc.h>
 #include <linux/slab.h>
+#include <linux/security.h>
 
 #include "kexec_internal.h"
 
@@ -63,15 +64,15 @@ static int kimage_alloc_init(struct kimage **rimage, unsigned long entry,
 	if (ret)
 		goto out_free_image;
 
-	ret = sanity_check_segment_list(image);
-	if (ret)
-		goto out_free_image;
-
-	 /* Enable the special crash kernel control page allocation policy. */
 	if (kexec_on_panic) {
+		/* Enable special crash kernel control page alloc policy. */
 		image->control_page = crashk_res.start;
 		image->type = KEXEC_TYPE_CRASH;
 	}
+
+	ret = sanity_check_segment_list(image);
+	if (ret)
+		goto out_free_image;
 
 	/*
 	 * Find a location for the control code buffer, and add it
@@ -132,6 +133,9 @@ SYSCALL_DEFINE4(kexec_load, unsigned long, entry, unsigned long, nr_segments,
 
 	/* We only trust the superuser with rebooting the system. */
 	if (!capable(CAP_SYS_BOOT) || kexec_load_disabled)
+		return -EPERM;
+
+	if (get_securelevel() > 0)
 		return -EPERM;
 
 	/*

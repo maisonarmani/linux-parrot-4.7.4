@@ -229,10 +229,14 @@ int main(int argc, char **argv)
 	ERR(!b, "%s", x509_name);
 	x509 = d2i_X509_bio(b, NULL); /* Binary encoded X.509 */
 	if (!x509) {
-		ERR(BIO_reset(b) != 1, "%s", x509_name);
+		/*
+		 * We want to hold onto the error messages in case
+		 * it's neither valid DER or PEM, but BIO_reset() will
+		 * print them immediately so we can't.
+		 */
+		drain_openssl_errors();
+		ERR(BIO_reset(b) != 0, "%s", x509_name);
 		x509 = PEM_read_bio_X509(b, NULL, NULL, NULL); /* PEM encoded X.509 */
-		if (x509)
-			drain_openssl_errors();
 	}
 	BIO_free(b);
 	ERR(!x509, "%s", x509_name);

@@ -6,6 +6,7 @@
 #include <linux/rcu.h>
 #include <linux/hardirq.h>
 #include <linux/kern_levels.h>
+#include <linux/compiler.h>
 
 #ifndef container_of
 #define container_of(ptr, type, member) ({			\

@@ -11,7 +11,7 @@
 #include <linux/acpi.h>
 #include <linux/pci.h>
 
-#include "amdgpu_acpi.h"
+#include "amd_acpi.h"
 
 struct amdgpu_atpx_functions {
 	bool px_params;
@@ -61,6 +61,10 @@ struct atpx_mux {
 
 bool amdgpu_has_atpx(void) {
 	return amdgpu_atpx_priv.atpx_detected;
+}
+
+bool amdgpu_has_atpx_dgpu_power_cntl(void) {
+	return amdgpu_atpx_priv.atpx.functions.power_cntl;
 }
 
 /**
@@ -142,10 +146,6 @@ static void amdgpu_atpx_parse_functions(struct amdgpu_atpx_functions *f, u32 mas
  */
 static int amdgpu_atpx_validate(struct amdgpu_atpx *atpx)
 {
-	/* make sure required functions are enabled */
-	/* dGPU power control is required */
-	atpx->functions.power_cntl = true;
-
 	if (atpx->functions.px_params) {
 		union acpi_object *info;
 		struct atpx_px_params output;

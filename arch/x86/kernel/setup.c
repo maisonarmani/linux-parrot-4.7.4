@@ -50,6 +50,7 @@
 #include <linux/init_ohci1394_dma.h>
 #include <linux/kvm_para.h>
 #include <linux/dma-contiguous.h>
+#include <linux/security.h>
 
 #include <linux/errno.h>
 #include <linux/kernel.h>
@@ -1048,6 +1049,8 @@ void __init setup_arch(char **cmdline_p)
 	if (mtrr_trim_uncached_memory(max_pfn))
 		max_pfn = e820_end_of_ram_pfn();
 
+	max_possible_pfn = max_pfn;
+
 #ifdef CONFIG_X86_32
 	/* max_low_pfn get updated here */
 	find_low_pfn_range();
@@ -1132,6 +1135,12 @@ void __init setup_arch(char **cmdline_p)
 #endif
 	/* Allocate bigger log buffer */
 	setup_log_buf(1);
+
+#ifdef CONFIG_EFI_SECURE_BOOT_SECURELEVEL
+	if (boot_params.secure_boot) {
+		set_securelevel(1);
+	}
+#endif
 
 	reserve_initrd();
 

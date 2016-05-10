@@ -26,7 +26,7 @@
  * Or, point your browser to http://www.gnu.org/copyleft/gpl.html
  *
  *
- * the project's page is at http://www.linuxtv.org/ 
+ * the project's page is at https://linuxtv.org
  */
 
 
@@ -1358,7 +1358,7 @@ static int av7110_register(struct av7110 *av7110)
 
 #ifdef CONFIG_DVB_AV7110_OSD
 	dvb_register_device(&av7110->dvb_adapter, &av7110->osd_dev,
-			    &dvbdev_osd, av7110, DVB_DEVICE_OSD);
+			    &dvbdev_osd, av7110, DVB_DEVICE_OSD, 0);
 #endif
 
 	dvb_net_init(&av7110->dvb_adapter, &av7110->dvb_net, &dvbdemux->dmx);
@@ -1533,7 +1533,7 @@ static int get_firmware(struct av7110* av7110)
 	if (ret) {
 		if (ret == -ENOENT)
 			printk(KERN_ERR "dvb-ttpci: firmware can be downloaded from"
-			       " http://www.linuxtv.org/download/dvb/firmware/\n");
+			       " https://linuxtv.org/download/dvb/firmware/\n");
 		return -EINVAL;
 	}
 
@@ -2307,7 +2307,7 @@ static int frontend_init(struct av7110 *av7110)
 /* Budgetpatch note:
  * Original hardware design by Roberto Deza:
  * There is a DVB_Wiki at
- * http://www.linuxtv.org/
+ * https://linuxtv.org
  *
  * New software triggering design by Emard that works on
  * original Roberto Deza's hardware:

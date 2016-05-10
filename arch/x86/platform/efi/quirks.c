@@ -8,6 +8,7 @@
 #include <linux/memblock.h>
 #include <linux/bootmem.h>
 #include <linux/acpi.h>
+#include <linux/dmi.h>
 #include <asm/efi.h>
 #include <asm/uv/uv.h>
 
@@ -137,7 +138,7 @@ EXPORT_SYMBOL_GPL(efi_query_variable_store);
  * else. We must only reserve (and then free) regions:
  *
  * - Not within any part of the kernel
- * - Not the bios reserved area (E820_RESERVED, E820_NVS, etc)
+ * - Not the BIOS reserved area (E820_RESERVED, E820_NVS, etc)
  */
 static bool can_free_region(u64 start, u64 size)
 {
@@ -227,7 +228,7 @@ void __init efi_free_boot_services(void)
 		    md->type != EFI_BOOT_SERVICES_DATA)
 			continue;
 
-		/* Do not free, someone else owns it */
+		/* Do not free, someone else owns it: */
 		if (md->attribute & EFI_MEMORY_RUNTIME)
 			continue;
 
@@ -293,6 +294,16 @@ out:
 	return ret;
 }
 
+static const struct dmi_system_id sgi_uv1_dmi[] = {
+	{ NULL, "SGI UV1",
+		{	DMI_MATCH(DMI_PRODUCT_NAME,	"Stoutland Platform"),
+			DMI_MATCH(DMI_PRODUCT_VERSION,	"1.0"),
+			DMI_MATCH(DMI_BIOS_VENDOR,	"SGI.COM"),
+		}
+	},
+	{ } /* NULL entry stops DMI scanning */
+};
+
 void __init efi_apply_memmap_quirks(void)
 {
 	/*
@@ -305,10 +316,8 @@ void __init efi_apply_memmap_quirks(void)
 		efi_unmap_memmap();
 	}
 
-	/*
-	 * UV doesn't support the new EFI pagetable mapping yet.
-	 */
-	if (is_uv_system())
+	/* UV2+ BIOS has a fix for this issue.  UV1 still needs the quirk. */
+	if (dmi_check_system(sgi_uv1_dmi))
 		set_bit(EFI_OLD_MEMMAP, &efi.flags);
 }
 

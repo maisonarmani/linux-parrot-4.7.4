@@ -27,6 +27,8 @@ board. Currently known boards are:
 "buffalo,lschlv2"
 "buffalo,lsxhl"
 "buffalo,lsxl"
+"cloudengines,pogo02"
+"cloudengines,pogoplugv4"
 "dlink,dns-320"
 "dlink,dns-320-a1"
 "dlink,dns-325"

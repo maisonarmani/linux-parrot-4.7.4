@@ -328,7 +328,7 @@ static int vc4_crtc_atomic_check(struct drm_crtc *crtc,
 	/* The pixelvalve can only feed one encoder (and encoders are
 	 * 1:1 with connectors.)
 	 */
-	if (drm_atomic_connectors_for_crtc(state->state, crtc) > 1)
+	if (hweight32(state->connector_mask) > 1)
 		return -EINVAL;
 
 	drm_atomic_crtc_state_for_each_plane(plane, state) {
@@ -703,7 +703,7 @@ static int vc4_crtc_bind(struct device *dev, struct device *master, void *data)
 	}
 
 	drm_crtc_init_with_planes(drm, crtc, primary_plane, cursor_plane,
-				  &vc4_crtc_funcs);
+				  &vc4_crtc_funcs, NULL);
 	drm_crtc_helper_add(crtc, &vc4_crtc_helper_funcs);
 	primary_plane->crtc = crtc;
 	cursor_plane->crtc = crtc;

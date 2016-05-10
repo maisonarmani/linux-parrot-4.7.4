@@ -156,6 +156,7 @@ struct thermal_attr {
  * @trip_hyst_attrs:	attributes for trip points for sysfs: trip hysteresis
  * @devdata:	private pointer for device private data
  * @trips:	number of trip points the thermal zone supports
+ * @trips_disabled;	bitmap for disabled trips
  * @passive_delay:	number of milliseconds to wait between polls when
  *			performing passive cooling.
  * @polling_delay:	number of milliseconds to wait between polls when
@@ -191,6 +192,7 @@ struct thermal_zone_device {
 	struct thermal_attr *trip_hyst_attrs;
 	void *devdata;
 	int trips;
+	unsigned long trips_disabled;	/* bitmap for disabled trips */
 	int passive_delay;
 	int polling_delay;
 	int temperature;
@@ -198,6 +200,7 @@ struct thermal_zone_device {
 	int emul_temperature;
 	int passive;
 	unsigned int forced_passive;
+	atomic_t need_update;
 	struct thermal_zone_device_ops *ops;
 	struct thermal_zone_params *tzp;
 	struct thermal_governor *governor;
@@ -207,9 +210,6 @@ struct thermal_zone_device {
 	struct mutex lock;
 	struct list_head node;
 	struct delayed_work poll_queue;
-#ifndef __GENKSYMS__
-	atomic_t need_update;
-#endif
 };
 
 /**
