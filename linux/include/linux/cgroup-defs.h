@@ -500,6 +500,10 @@ struct cgroup_subsys {
 	 * specifies the mask of subsystems that this one depends on.
 	 */
 	unsigned int depends_on;
+
+#ifndef __GENKSYMS__
+	void (*post_attach)(void);
+#endif
 };
 
 extern struct percpu_rw_semaphore cgroup_threadgroup_rwsem;
