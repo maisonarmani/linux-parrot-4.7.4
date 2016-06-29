@@ -45,7 +45,7 @@ Binary: linux-source-4.6, linux-support-4.6.0-parrot, linux-doc-4.6, linux-manua
  jfs-modules-4.6.0-parrot-sparc64-di, xfs-modules-4.6.0-parrot-sparc64-di, fat-modules-4.6.0-parrot-sparc64-di, md-modules-4.6.0-parrot-sparc64-di, multipath-modules-4.6.0-parrot-sparc64-di, usb-modules-4.6.0-parrot-sparc64-di, usb-storage-modules-4.6.0-parrot-sparc64-di, input-modules-4.6.0-parrot-sparc64-di, sata-modules-4.6.0-parrot-sparc64-di, core-modules-4.6.0-parrot-sparc64-di, crc-modules-4.6.0-parrot-sparc64-di, crypto-modules-4.6.0-parrot-sparc64-di, crypto-dm-modules-4.6.0-parrot-sparc64-di, ata-modules-4.6.0-parrot-sparc64-di, nbd-modules-4.6.0-parrot-sparc64-di, squashfs-modules-4.6.0-parrot-sparc64-di, virtio-modules-4.6.0-parrot-sparc64-di, zlib-modules-4.6.0-parrot-sparc64-di, udf-modules-4.6.0-parrot-sparc64-di, fuse-modules-4.6.0-parrot-sparc64-di, linux-image-4.6.0-parrot-sparc64, linux-headers-4.6.0-parrot-sparc64, linux-image-4.6.0-parrot-sparc64-smp, linux-headers-4.6.0-parrot-sparc64-smp, linux-compiler-gcc-5-arm, linux-compiler-gcc-5-s390,
  linux-compiler-gcc-5-x86
 Architecture: linux-any all tilegx
-Version: 4.6.2-1parrot0
+Version: 4.6.2-2parrot0
 Maintainer: Kali Developers <devel@kali.org>
 Uploaders: Raphaël Hertzog <hertzog@debian.org>, Sophie Brun <sophie@freexian.com>
 Homepage: https://www.kernel.org/
@@ -1106,10 +1106,10 @@ Package-List:
  zlib-modules-4.6.0-parrot-versatile-di udeb debian-installer extra arch=armel profile=!stage1
 Checksums-Sha1:
  322f3d395a21df2b2269f0eeed8b2df77d646bc4 90740608 linux_4.6.2.orig.tar.xz
- 6fd4ef7e38feb3421d9f4790004e31862b9af32a 3236784 linux_4.6.2-1parrot0.debian.tar.xz
+ e28692a30ddd4182fdf16d2b93af79ec124e3c44 3236652 linux_4.6.2-2parrot0.debian.tar.xz
 Checksums-Sha256:
  f7c6b5111d53da599f0a5550868c50a31d19a884909b68809f300cdffb817637 90740608 linux_4.6.2.orig.tar.xz
- 0ff7795037007c4558718f84ebe50f976527d5423f61b3baf597c2e3f0f2b8f6 3236784 linux_4.6.2-1parrot0.debian.tar.xz
+ fd0f0cb60544f355609016ded891c58dfd13a08b950d9905adb334a24c7ccf1e 3236652 linux_4.6.2-2parrot0.debian.tar.xz
 Files:
  57daf77e271852dc2540e37c8f4a3115 90740608 linux_4.6.2.orig.tar.xz
- caae47ecd24fe433094588f137f02e28 3236784 linux_4.6.2-1parrot0.debian.tar.xz
+ eaf4c3541d94bbb8af863b2073891c9c 3236652 linux_4.6.2-2parrot0.debian.tar.xz
