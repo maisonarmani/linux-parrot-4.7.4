@@ -112,7 +112,7 @@
 			linux,code = <116>;
 			label = "power";
 			debounce-interval = <10>;
-			gpio-key,wakeup;
+			wakeup-source;
 		};
 
 		ok-key {
@@ -298,6 +298,8 @@
 		compatible = "maxim,max8997-pmic";
 
 		reg = <0x66>;
+		interrupt-parent = <&gpx0>;
+		interrupts = <7 0>;
 
 		max8997,pmic-buck1-uses-gpio-dvs;
 		max8997,pmic-buck2-uses-gpio-dvs;

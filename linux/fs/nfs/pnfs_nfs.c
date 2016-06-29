@@ -246,6 +246,23 @@ void pnfs_fetch_commit_bucket_list(struct list_head *pages,
 
 }
 
+/* Helper function for pnfs_generic_commit_pagelist to catch an empty
+ * page list. This can happen when two commits race. */
+static bool
+pnfs_generic_commit_cancel_empty_pagelist(struct list_head *pages,
+					  struct nfs_commit_data *data,
+					  struct nfs_commit_info *cinfo)
+{
+	if (list_empty(pages)) {
+		if (atomic_dec_and_test(&cinfo->mds->rpcs_out))
+			wake_up_atomic_t(&cinfo->mds->rpcs_out);
+		nfs_commitdata_release(data);
+		return true;
+	}
+
+	return false;
+}
+
 /* This follows nfs_commit_list pretty closely */
 int
 pnfs_generic_commit_pagelist(struct inode *inode, struct list_head *mds_pages,
@@ -280,6 +297,11 @@ pnfs_generic_commit_pagelist(struct inode *inode, struct list_head *mds_pages,
 	list_for_each_entry_safe(data, tmp, &list, pages) {
 		list_del_init(&data->pages);
 		if (data->ds_commit_index < 0) {
+			/* another commit raced with us */
+			if (pnfs_generic_commit_cancel_empty_pagelist(mds_pages,
+				data, cinfo))
+				continue;
+
 			nfs_init_commit(data, mds_pages, NULL, cinfo);
 			nfs_initiate_commit(NFS_CLIENT(inode), data,
 					    NFS_PROTO(data->inode),
@@ -288,6 +310,12 @@ pnfs_generic_commit_pagelist(struct inode *inode, struct list_head *mds_pages,
 			LIST_HEAD(pages);
 
 			pnfs_fetch_commit_bucket_list(&pages, data, cinfo);
+
+			/* another commit raced with us */
+			if (pnfs_generic_commit_cancel_empty_pagelist(&pages,
+				data, cinfo))
+				continue;
+
 			nfs_init_commit(data, &pages, data->lseg, cinfo);
 			initiate_commit(data, how);
 		}
@@ -606,12 +634,22 @@ static int _nfs4_pnfs_v3_ds_connect(struct nfs_server *mds_srv,
 		dprintk("%s: DS %s: trying address %s\n",
 			__func__, ds->ds_remotestr, da->da_remotestr);
 
-		clp = get_v3_ds_connect(mds_srv->nfs_client,
+		if (!IS_ERR(clp)) {
+			struct xprt_create xprt_args = {
+				.ident = XPRT_TRANSPORT_TCP,
+				.net = clp->cl_net,
+				.dstaddr = (struct sockaddr *)&da->da_addr,
+				.addrlen = da->da_addrlen,
+				.servername = clp->cl_hostname,
+			};
+			/* Add this address as an alias */
+			rpc_clnt_add_xprt(clp->cl_rpcclient, &xprt_args,
+					rpc_clnt_test_and_add_xprt, NULL);
+		} else
+			clp = get_v3_ds_connect(mds_srv->nfs_client,
 					(struct sockaddr *)&da->da_addr,
 					da->da_addrlen, IPPROTO_TCP,
 					timeo, retrans, au_flavor);
-		if (!IS_ERR(clp))
-			break;
 	}
 
 	if (IS_ERR(clp)) {

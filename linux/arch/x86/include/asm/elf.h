@@ -9,6 +9,7 @@
 #include <asm/ptrace.h>
 #include <asm/user.h>
 #include <asm/auxvec.h>
+#include <asm/syscall.h>
 
 typedef unsigned long elf_greg_t;
 
@@ -154,12 +155,6 @@ do {						\
 
 #else /* CONFIG_X86_32 */
 
-#ifdef CONFIG_X86_X32_ABI
-extern bool x32_enabled;
-#else
-#define x32_enabled 0
-#endif
-
 /*
  * This is used to ensure we don't load something for the wrong architecture.
  */
@@ -262,7 +257,7 @@ extern int force_personality32;
    instruction set this CPU supports.  This could be done in user space,
    but it's not easy, and we've already done it here.  */
 
-#define ELF_HWCAP		(boot_cpu_data.x86_capability[0])
+#define ELF_HWCAP		(boot_cpu_data.x86_capability[CPUID_1_EDX])
 
 /* This yields a string that ld.so will use to load implementation
    specific libraries for optimization.  This is more specific in

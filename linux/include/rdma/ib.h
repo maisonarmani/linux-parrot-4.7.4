@@ -34,9 +34,7 @@
 #define _RDMA_IB_H
 
 #include <linux/types.h>
-#ifndef __GENKSYMS__
 #include <linux/sched.h>
-#endif
 
 struct ib_addr {
 	union {

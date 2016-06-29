@@ -574,7 +574,8 @@ static int tipc_nl_compat_link_dump(struct tipc_nl_compat_msg *msg,
 
 	link_info.dest = nla_get_flag(link[TIPC_NLA_LINK_DEST]);
 	link_info.up = htonl(nla_get_flag(link[TIPC_NLA_LINK_UP]));
-	strcpy(link_info.str, nla_data(link[TIPC_NLA_LINK_NAME]));
+	nla_strlcpy(link_info.str, nla_data(link[TIPC_NLA_LINK_NAME]),
+		    TIPC_MAX_LINK_NAME);
 
 	return tipc_add_tlv(msg->rep, TIPC_TLV_LINK_INFO,
 			    &link_info, sizeof(link_info));
@@ -1104,8 +1105,8 @@ static int tipc_nl_compat_recv(struct sk_buff *skb, struct genl_info *info)
 	req_nlh = (struct nlmsghdr *)skb->data;
 	msg.req = nlmsg_data(req_nlh) + GENL_HDRLEN + TIPC_GENL_HDRLEN;
 	msg.cmd = req_userhdr->cmd;
-	msg.dst_sk = info->dst_sk;
 	msg.net = genl_info_net(info);
+	msg.dst_sk = skb->sk;
 
 	if ((msg.cmd & 0xC000) && (!netlink_net_capable(skb, CAP_NET_ADMIN))) {
 		msg.rep = tipc_get_err_tlv(TIPC_CFG_NOT_NET_ADMIN);

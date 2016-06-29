@@ -51,6 +51,7 @@
 #define CM_GNRICCTL		0x000
 #define CM_GNRICDIV		0x004
 # define CM_DIV_FRAC_BITS	12
+# define CM_DIV_FRAC_MASK	GENMASK(CM_DIV_FRAC_BITS - 1, 0)
 
 #define CM_VPUCTL		0x008
 #define CM_VPUDIV		0x00c
@@ -88,10 +89,23 @@
 #define CM_HSMDIV		0x08c
 #define CM_OTPCTL		0x090
 #define CM_OTPDIV		0x094
+#define CM_PCMCTL		0x098
+#define CM_PCMDIV		0x09c
 #define CM_PWMCTL		0x0a0
 #define CM_PWMDIV		0x0a4
+#define CM_SLIMCTL		0x0a8
+#define CM_SLIMDIV		0x0ac
 #define CM_SMICTL		0x0b0
 #define CM_SMIDIV		0x0b4
+/* no definition for 0x0b8  and 0x0bc */
+#define CM_TCNTCTL		0x0c0
+#define CM_TCNTDIV		0x0c4
+#define CM_TECCTL		0x0c8
+#define CM_TECDIV		0x0cc
+#define CM_TD0CTL		0x0d0
+#define CM_TD0DIV		0x0d4
+#define CM_TD1CTL		0x0d8
+#define CM_TD1DIV		0x0dc
 #define CM_TSENSCTL		0x0e0
 #define CM_TSENSDIV		0x0e4
 #define CM_TIMERCTL		0x0e8
@@ -115,6 +129,7 @@
 # define CM_GATE			BIT(CM_GATE_BIT)
 # define CM_BUSY			BIT(7)
 # define CM_BUSYD			BIT(8)
+# define CM_FRAC			BIT(9)
 # define CM_SRC_SHIFT			0
 # define CM_SRC_BITS			4
 # define CM_SRC_MASK			0xf
@@ -311,21 +326,18 @@ void __init bcm2835_init_clocks(void)
 	struct clk *clk;
 	int ret;
 
-	clk = clk_register_fixed_rate(NULL, "apb_pclk", NULL, CLK_IS_ROOT,
-					126000000);
+	clk = clk_register_fixed_rate(NULL, "apb_pclk", NULL, 0, 126000000);
 	if (IS_ERR(clk))
 		pr_err("apb_pclk not registered\n");
 
-	clk = clk_register_fixed_rate(NULL, "uart0_pclk", NULL, CLK_IS_ROOT,
-					3000000);
+	clk = clk_register_fixed_rate(NULL, "uart0_pclk", NULL, 0, 3000000);
 	if (IS_ERR(clk))
 		pr_err("uart0_pclk not registered\n");
 	ret = clk_register_clkdev(clk, NULL, "20201000.uart");
 	if (ret)
 		pr_err("uart0_pclk alias not registered\n");
 
-	clk = clk_register_fixed_rate(NULL, "uart1_pclk", NULL, CLK_IS_ROOT,
-					125000000);
+	clk = clk_register_fixed_rate(NULL, "uart1_pclk", NULL, 0, 125000000);
 	if (IS_ERR(clk))
 		pr_err("uart1_pclk not registered\n");
 	ret = clk_register_clkdev(clk, NULL, "20215000.uart");
@@ -634,6 +646,7 @@ struct bcm2835_clock_data {
 	u32 frac_bits;
 
 	bool is_vpu_clock;
+	bool is_mash_clock;
 };
 
 static const char *const bcm2835_clock_per_parents[] = {
@@ -815,6 +828,7 @@ static const struct bcm2835_clock_data bcm2835_clock_pwm_data = {
 	.div_reg = CM_PWMDIV,
 	.int_bits = 12,
 	.frac_bits = 12,
+	.is_mash_clock = true,
 };
 
 struct bcm2835_pll {
@@ -900,8 +914,14 @@ static void bcm2835_pll_off(struct clk_hw *hw)
 	struct bcm2835_cprman *cprman = pll->cprman;
 	const struct bcm2835_pll_data *data = pll->data;
 
-	cprman_write(cprman, data->cm_ctrl_reg, CM_PLL_ANARST);
-	cprman_write(cprman, data->a2w_ctrl_reg, A2W_PLL_CTRL_PWRDN);
+	spin_lock(&cprman->regs_lock);
+	cprman_write(cprman, data->cm_ctrl_reg,
+		     cprman_read(cprman, data->cm_ctrl_reg) |
+		     CM_PLL_ANARST);
+	cprman_write(cprman, data->a2w_ctrl_reg,
+		     cprman_read(cprman, data->a2w_ctrl_reg) |
+		     A2W_PLL_CTRL_PWRDN);
+	spin_unlock(&cprman->regs_lock);
 }
 
 static int bcm2835_pll_on(struct clk_hw *hw)
@@ -910,6 +930,10 @@ static int bcm2835_pll_on(struct clk_hw *hw)
 	struct bcm2835_cprman *cprman = pll->cprman;
 	const struct bcm2835_pll_data *data = pll->data;
 	ktime_t timeout;
+
+	cprman_write(cprman, data->a2w_ctrl_reg,
+		     cprman_read(cprman, data->a2w_ctrl_reg) &
+		     ~A2W_PLL_CTRL_PWRDN);
 
 	/* Take the PLL out of reset. */
 	cprman_write(cprman, data->cm_ctrl_reg,
@@ -1060,16 +1084,7 @@ static long bcm2835_pll_divider_round_rate(struct clk_hw *hw,
 static unsigned long bcm2835_pll_divider_get_rate(struct clk_hw *hw,
 						  unsigned long parent_rate)
 {
-	struct bcm2835_pll_divider *divider = bcm2835_pll_divider_from_hw(hw);
-	struct bcm2835_cprman *cprman = divider->cprman;
-	const struct bcm2835_pll_divider_data *data = divider->data;
-	u32 div = cprman_read(cprman, data->a2w_reg);
-
-	div &= (1 << A2W_PLL_DIV_BITS) - 1;
-	if (div == 0)
-		div = 256;
-
-	return parent_rate / div;
+	return clk_divider_ops.recalc_rate(hw, parent_rate);
 }
 
 static void bcm2835_pll_divider_off(struct clk_hw *hw)
@@ -1078,10 +1093,12 @@ static void bcm2835_pll_divider_off(struct clk_hw *hw)
 	struct bcm2835_cprman *cprman = divider->cprman;
 	const struct bcm2835_pll_divider_data *data = divider->data;
 
+	spin_lock(&cprman->regs_lock);
 	cprman_write(cprman, data->cm_reg,
 		     (cprman_read(cprman, data->cm_reg) &
 		      ~data->load_mask) | data->hold_mask);
 	cprman_write(cprman, data->a2w_reg, A2W_PLL_CHANNEL_DISABLE);
+	spin_unlock(&cprman->regs_lock);
 }
 
 static int bcm2835_pll_divider_on(struct clk_hw *hw)
@@ -1090,12 +1107,14 @@ static int bcm2835_pll_divider_on(struct clk_hw *hw)
 	struct bcm2835_cprman *cprman = divider->cprman;
 	const struct bcm2835_pll_divider_data *data = divider->data;
 
+	spin_lock(&cprman->regs_lock);
 	cprman_write(cprman, data->a2w_reg,
 		     cprman_read(cprman, data->a2w_reg) &
 		     ~A2W_PLL_CHANNEL_DISABLE);
 
 	cprman_write(cprman, data->cm_reg,
 		     cprman_read(cprman, data->cm_reg) & ~data->hold_mask);
+	spin_unlock(&cprman->regs_lock);
 
 	return 0;
 }
@@ -1169,7 +1188,7 @@ static u32 bcm2835_clock_choose_div(struct clk_hw *hw,
 		GENMASK(CM_DIV_FRAC_BITS - data->frac_bits, 0) >> 1;
 	u64 temp = (u64)parent_rate << CM_DIV_FRAC_BITS;
 	u64 rem;
-	u32 div;
+	u32 div, mindiv, maxdiv;
 
 	rem = do_div(temp, rate);
 	div = temp;
@@ -1179,10 +1198,23 @@ static u32 bcm2835_clock_choose_div(struct clk_hw *hw,
 		div += unused_frac_mask + 1;
 	div &= ~unused_frac_mask;
 
-	/* Clamp to the limits. */
-	div = max(div, unused_frac_mask + 1);
-	div = min_t(u32, div, GENMASK(data->int_bits + CM_DIV_FRAC_BITS - 1,
-				      CM_DIV_FRAC_BITS - data->frac_bits));
+	/* different clamping limits apply for a mash clock */
+	if (data->is_mash_clock) {
+		/* clamp to min divider of 2 */
+		mindiv = 2 << CM_DIV_FRAC_BITS;
+		/* clamp to the highest possible integer divider */
+		maxdiv = (BIT(data->int_bits) - 1) << CM_DIV_FRAC_BITS;
+	} else {
+		/* clamp to min divider of 1 */
+		mindiv = 1 << CM_DIV_FRAC_BITS;
+		/* clamp to the highest possible fractional divider */
+		maxdiv = GENMASK(data->int_bits + CM_DIV_FRAC_BITS - 1,
+				 CM_DIV_FRAC_BITS - data->frac_bits);
+	}
+
+	/* apply the clamping  limits */
+	div = max_t(u32, div, mindiv);
+	div = min_t(u32, div, maxdiv);
 
 	return div;
 }
@@ -1276,8 +1308,25 @@ static int bcm2835_clock_set_rate(struct clk_hw *hw,
 	struct bcm2835_cprman *cprman = clock->cprman;
 	const struct bcm2835_clock_data *data = clock->data;
 	u32 div = bcm2835_clock_choose_div(hw, rate, parent_rate, false);
+	u32 ctl;
+
+	spin_lock(&cprman->regs_lock);
+
+	/*
+	 * Setting up frac support
+	 *
+	 * In principle it is recommended to stop/start the clock first,
+	 * but as we set CLK_SET_RATE_GATE during registration of the
+	 * clock this requirement should be take care of by the
+	 * clk-framework.
+	 */
+	ctl = cprman_read(cprman, data->ctl_reg) & ~CM_FRAC;
+	ctl |= (div & CM_DIV_FRAC_MASK) ? CM_FRAC : 0;
+	cprman_write(cprman, data->ctl_reg, ctl);
 
 	cprman_write(cprman, data->div_reg, div);
+
+	spin_unlock(&cprman->regs_lock);
 
 	return 0;
 }
@@ -1430,7 +1479,7 @@ bcm2835_register_pll_divider(struct bcm2835_cprman *cprman,
 	divider->div.reg = cprman->regs + data->a2w_reg;
 	divider->div.shift = A2W_PLL_DIV_SHIFT;
 	divider->div.width = A2W_PLL_DIV_BITS;
-	divider->div.flags = 0;
+	divider->div.flags = CLK_DIVIDER_MAX_AT_ZERO;
 	divider->div.lock = &cprman->regs_lock;
 	divider->div.hw.init = &init;
 	divider->div.table = NULL;

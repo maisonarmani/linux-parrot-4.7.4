@@ -168,11 +168,12 @@ get_entry(const void *base, unsigned int offset)
 
 /* All zeroes == unconditional rule. */
 /* Mildly perf critical (only if packet tracing is on) */
-static inline bool unconditional(const struct ipt_ip *ip)
+static inline bool unconditional(const struct ipt_entry *e)
 {
 	static const struct ipt_ip uncond;
 
-	return memcmp(ip, &uncond, sizeof(uncond)) == 0;
+	return e->target_offset == sizeof(struct ipt_entry) &&
+	       memcmp(&e->ip, &uncond, sizeof(uncond)) == 0;
 #undef FWINV
 }
 
@@ -229,11 +230,10 @@ get_chainname_rulenum(const struct ipt_entry *s, const struct ipt_entry *e,
 	} else if (s == e) {
 		(*rulenum)++;
 
-		if (s->target_offset == sizeof(struct ipt_entry) &&
+		if (unconditional(s) &&
 		    strcmp(t->target.u.kernel.target->name,
 			   XT_STANDARD_TARGET) == 0 &&
-		   t->verdict < 0 &&
-		   unconditional(&s->ip)) {
+		   t->verdict < 0) {
 			/* Tail of chains: STANDARD target (return/policy) */
 			*comment = *chainname == hookname
 				? comments[NF_IP_TRACE_COMMENT_POLICY]
@@ -476,11 +476,10 @@ mark_source_chains(const struct xt_table_info *newinfo,
 			e->comefrom |= ((1 << hook) | (1 << NF_INET_NUMHOOKS));
 
 			/* Unconditional return/END. */
-			if ((e->target_offset == sizeof(struct ipt_entry) &&
+			if ((unconditional(e) &&
 			     (strcmp(t->target.u.user.name,
 				     XT_STANDARD_TARGET) == 0) &&
-			     t->verdict < 0 && unconditional(&e->ip)) ||
-			    visited) {
+			     t->verdict < 0) || visited) {
 				unsigned int oldpos, size;
 
 				if ((strcmp(t->target.u.user.name,
@@ -715,7 +714,7 @@ static bool check_underflow(const struct ipt_entry *e)
 	const struct xt_entry_target *t;
 	unsigned int verdict;
 
-	if (!unconditional(&e->ip))
+	if (!unconditional(e))
 		return false;
 	t = ipt_get_target_c(e);
 	if (strcmp(t->u.user.name, XT_STANDARD_TARGET) != 0)
@@ -763,9 +762,9 @@ check_entry_size_and_hooks(struct ipt_entry *e,
 			newinfo->hook_entry[h] = hook_entries[h];
 		if ((unsigned char *)e - base == underflows[h]) {
 			if (!check_underflow(e)) {
-				pr_err("Underflows must be unconditional and "
-				       "use the STANDARD target with "
-				       "ACCEPT/DROP\n");
+				pr_debug("Underflows must be unconditional and "
+					 "use the STANDARD target with "
+					 "ACCEPT/DROP\n");
 				return -EINVAL;
 			}
 			newinfo->underflow[h] = underflows[h];
@@ -1157,6 +1156,7 @@ get_entries(struct net *net, struct ipt_get_entries __user *uptr,
 			 *len, sizeof(get) + get.size);
 		return -EINVAL;
 	}
+	get.name[sizeof(get.name) - 1] = '\0';
 
 	t = xt_find_table_lock(net, AF_INET, get.name);
 	if (!IS_ERR_OR_NULL(t)) {
@@ -1936,6 +1936,7 @@ compat_get_entries(struct net *net, struct compat_ipt_get_entries __user *uptr,
 			 *len, sizeof(get) + get.size);
 		return -EINVAL;
 	}
+	get.name[sizeof(get.name) - 1] = '\0';
 
 	xt_compat_lock(AF_INET);
 	t = xt_find_table_lock(net, AF_INET, get.name);
@@ -2063,44 +2064,7 @@ do_ipt_get_ctl(struct sock *sk, int cmd, void __user *user, int *len)
 	return ret;
 }
 
-struct xt_table *ipt_register_table(struct net *net,
-				    const struct xt_table *table,
-				    const struct ipt_replace *repl)
-{
-	int ret;
-	struct xt_table_info *newinfo;
-	struct xt_table_info bootstrap = {0};
-	void *loc_cpu_entry;
-	struct xt_table *new_table;
-
-	newinfo = xt_alloc_table_info(repl->size);
-	if (!newinfo) {
-		ret = -ENOMEM;
-		goto out;
-	}
-
-	loc_cpu_entry = newinfo->entries;
-	memcpy(loc_cpu_entry, repl->entries, repl->size);
-
-	ret = translate_table(net, newinfo, loc_cpu_entry, repl);
-	if (ret != 0)
-		goto out_free;
-
-	new_table = xt_register_table(net, table, &bootstrap, newinfo);
-	if (IS_ERR(new_table)) {
-		ret = PTR_ERR(new_table);
-		goto out_free;
-	}
-
-	return new_table;
-
-out_free:
-	xt_free_table_info(newinfo);
-out:
-	return ERR_PTR(ret);
-}
-
-void ipt_unregister_table(struct net *net, struct xt_table *table)
+static void __ipt_unregister_table(struct net *net, struct xt_table *table)
 {
 	struct xt_table_info *private;
 	void *loc_cpu_entry;
@@ -2116,6 +2080,56 @@ void ipt_unregister_table(struct net *net, struct xt_table *table)
 	if (private->number > private->initial_entries)
 		module_put(table_owner);
 	xt_free_table_info(private);
+}
+
+int ipt_register_table(struct net *net, const struct xt_table *table,
+		       const struct ipt_replace *repl,
+		       const struct nf_hook_ops *ops, struct xt_table **res)
+{
+	int ret;
+	struct xt_table_info *newinfo;
+	struct xt_table_info bootstrap = {0};
+	void *loc_cpu_entry;
+	struct xt_table *new_table;
+
+	newinfo = xt_alloc_table_info(repl->size);
+	if (!newinfo)
+		return -ENOMEM;
+
+	loc_cpu_entry = newinfo->entries;
+	memcpy(loc_cpu_entry, repl->entries, repl->size);
+
+	ret = translate_table(net, newinfo, loc_cpu_entry, repl);
+	if (ret != 0)
+		goto out_free;
+
+	new_table = xt_register_table(net, table, &bootstrap, newinfo);
+	if (IS_ERR(new_table)) {
+		ret = PTR_ERR(new_table);
+		goto out_free;
+	}
+
+	/* set res now, will see skbs right after nf_register_net_hooks */
+	WRITE_ONCE(*res, new_table);
+
+	ret = nf_register_net_hooks(net, ops, hweight32(table->valid_hooks));
+	if (ret != 0) {
+		__ipt_unregister_table(net, new_table);
+		*res = NULL;
+	}
+
+	return ret;
+
+out_free:
+	xt_free_table_info(newinfo);
+	return ret;
+}
+
+void ipt_unregister_table(struct net *net, struct xt_table *table,
+			  const struct nf_hook_ops *ops)
+{
+	nf_unregister_net_hooks(net, ops, hweight32(table->valid_hooks));
+	__ipt_unregister_table(net, table);
 }
 
 /* Returns 1 if the type and code is matched by the range, 0 otherwise */

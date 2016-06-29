@@ -767,7 +767,6 @@ int vb2_queue_init(struct vb2_queue *q)
 		q->buf_struct_size = sizeof(struct vb2_v4l2_buffer);
 
 	q->buf_ops = &v4l2_buf_ops;
-	q->have_verify_planes_array = 1;
 	q->is_multiplanar = V4L2_TYPE_IS_MULTIPLANAR(q->type);
 	q->is_output = V4L2_TYPE_IS_OUTPUT(q->type);
 	q->copy_timestamp = (q->timestamp_flags & V4L2_BUF_FLAG_TIMESTAMP_MASK)

@@ -387,14 +387,11 @@ struct vb2_ops {
  *			the vb2_buffer struct.
  */
 struct vb2_buf_ops {
+	int (*verify_planes_array)(struct vb2_buffer *vb, const void *pb);
 	void (*fill_user_buffer)(struct vb2_buffer *vb, void *pb);
 	int (*fill_vb2_buffer)(struct vb2_buffer *vb, const void *pb,
 				struct vb2_plane *planes);
 	void (*copy_timestamp)(struct vb2_buffer *vb, const void *pb);
-#ifndef __GENKSYMS__
-	/* Only valid if vb2_queue::have_verify_planes_array is set */
-	int (*verify_planes_array)(struct vb2_buffer *vb, const void *pb);
-#endif
 };
 
 /**
@@ -473,11 +470,7 @@ struct vb2_queue {
 	unsigned			fileio_read_once:1;
 	unsigned			fileio_write_immediately:1;
 	unsigned			allow_zero_bytesused:1;
-#ifndef __GENKSYMS__
 	unsigned		   quirk_poll_must_check_waiting_for_buffers:1;
-	unsigned			have_verify_planes_array:1;
-	/* 27 bits spare */
-#endif
 
 	struct mutex			*lock;
 	void				*owner;

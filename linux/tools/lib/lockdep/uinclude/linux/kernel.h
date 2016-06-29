@@ -6,7 +6,8 @@
 #include <linux/rcu.h>
 #include <linux/hardirq.h>
 #include <linux/kern_levels.h>
-#include <linux/compiler.h>
+
+#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
 #ifndef container_of
 #define container_of(ptr, type, member) ({			\
@@ -21,10 +22,16 @@
 	_max1 > _max2 ? _max1 : _max2; })
 
 #define BUILD_BUG_ON(condition) ((void)sizeof(char[1 - 2*!!(condition)]))
-#define WARN_ON(x) (x)
-#define WARN_ON_ONCE(x) (x)
+
+static inline int lockdep_warn(int condition)
+{
+	return condition;
+}
+#define WARN_ON(x) lockdep_warn(x)
+#define WARN_ON_ONCE(x) WARN_ON(x)
+#define WARN(x, y...) WARN_ON(x)
+
 #define likely(x) (x)
-#define WARN(x, y...) (x)
 #define uninitialized_var(x) x
 #define __init
 #define noinline

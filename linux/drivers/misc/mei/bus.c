@@ -44,7 +44,7 @@ ssize_t __mei_cl_send(struct mei_cl *cl, u8 *buf, size_t length,
 			bool blocking)
 {
 	struct mei_device *bus;
-	struct mei_cl_cb *cb = NULL;
+	struct mei_cl_cb *cb;
 	ssize_t rets;
 
 	if (WARN_ON(!cl || !cl->dev))
@@ -86,8 +86,6 @@ ssize_t __mei_cl_send(struct mei_cl *cl, u8 *buf, size_t length,
 
 out:
 	mutex_unlock(&bus->device_lock);
-	if (rets < 0)
-		mei_io_cb_free(cb);
 
 	return rets;
 }
@@ -222,8 +220,11 @@ EXPORT_SYMBOL_GPL(mei_cldev_recv);
 static void mei_cl_bus_event_work(struct work_struct *work)
 {
 	struct mei_cl_device *cldev;
+	struct mei_device *bus;
 
 	cldev = container_of(work, struct mei_cl_device, event_work);
+
+	bus = cldev->bus;
 
 	if (cldev->event_cb)
 		cldev->event_cb(cldev, cldev->events, cldev->event_context);
@@ -231,53 +232,66 @@ static void mei_cl_bus_event_work(struct work_struct *work)
 	cldev->events = 0;
 
 	/* Prepare for the next read */
-	if (cldev->events_mask & BIT(MEI_CL_EVENT_RX))
+	if (cldev->events_mask & BIT(MEI_CL_EVENT_RX)) {
+		mutex_lock(&bus->device_lock);
 		mei_cl_read_start(cldev->cl, 0, NULL);
+		mutex_unlock(&bus->device_lock);
+	}
 }
 
 /**
  * mei_cl_bus_notify_event - schedule notify cb on bus client
  *
  * @cl: host client
+ *
+ * Return: true if event was scheduled
+ *         false if the client is not waiting for event
  */
-void mei_cl_bus_notify_event(struct mei_cl *cl)
+bool mei_cl_bus_notify_event(struct mei_cl *cl)
 {
 	struct mei_cl_device *cldev = cl->cldev;
 
 	if (!cldev || !cldev->event_cb)
-		return;
+		return false;
 
 	if (!(cldev->events_mask & BIT(MEI_CL_EVENT_NOTIF)))
-		return;
+		return false;
 
 	if (!cl->notify_ev)
-		return;
+		return false;
 
 	set_bit(MEI_CL_EVENT_NOTIF, &cldev->events);
 
 	schedule_work(&cldev->event_work);
 
 	cl->notify_ev = false;
+
+	return true;
 }
 
 /**
- * mei_cl_bus_rx_event  - schedule rx evenet
+ * mei_cl_bus_rx_event  - schedule rx event
  *
  * @cl: host client
+ *
+ * Return: true if event was scheduled
+ *         false if the client is not waiting for event
  */
-void mei_cl_bus_rx_event(struct mei_cl *cl)
+bool mei_cl_bus_rx_event(struct mei_cl *cl)
 {
 	struct mei_cl_device *cldev = cl->cldev;
 
 	if (!cldev || !cldev->event_cb)
-		return;
+		return false;
 
 	if (!(cldev->events_mask & BIT(MEI_CL_EVENT_RX)))
-		return;
+		return false;
 
 	set_bit(MEI_CL_EVENT_RX, &cldev->events);
 
 	schedule_work(&cldev->event_work);
+
+	return true;
 }
 
 /**
@@ -296,6 +310,7 @@ int mei_cldev_register_event_cb(struct mei_cl_device *cldev,
 				unsigned long events_mask,
 				mei_cldev_event_cb_t event_cb, void *context)
 {
+	struct mei_device *bus = cldev->bus;
 	int ret;
 
 	if (cldev->event_cb)
@@ -308,15 +323,17 @@ int mei_cldev_register_event_cb(struct mei_cl_device *cldev,
 	INIT_WORK(&cldev->event_work, mei_cl_bus_event_work);
 
 	if (cldev->events_mask & BIT(MEI_CL_EVENT_RX)) {
+		mutex_lock(&bus->device_lock);
 		ret = mei_cl_read_start(cldev->cl, 0, NULL);
+		mutex_unlock(&bus->device_lock);
 		if (ret && ret != -EBUSY)
 			return ret;
 	}
 
 	if (cldev->events_mask & BIT(MEI_CL_EVENT_NOTIF)) {
-		mutex_lock(&cldev->cl->dev->device_lock);
+		mutex_lock(&bus->device_lock);
 		ret = mei_cl_notify_request(cldev->cl, NULL, event_cb ? 1 : 0);
-		mutex_unlock(&cldev->cl->dev->device_lock);
+		mutex_unlock(&bus->device_lock);
 		if (ret)
 			return ret;
 	}
@@ -407,7 +424,7 @@ int mei_cldev_enable(struct mei_cl_device *cldev)
 
 	if (!cl) {
 		mutex_lock(&bus->device_lock);
-		cl = mei_cl_alloc_linked(bus, MEI_HOST_CLIENT_ID_ANY);
+		cl = mei_cl_alloc_linked(bus);
 		mutex_unlock(&bus->device_lock);
 		if (IS_ERR(cl))
 			return PTR_ERR(cl);
@@ -965,6 +982,22 @@ void mei_cl_bus_rescan(struct mei_device *bus)
 	mutex_unlock(&bus->cl_bus_lock);
 
 	dev_dbg(bus->dev, "rescan end");
+}
+
+void mei_cl_bus_rescan_work(struct work_struct *work)
+{
+	struct mei_device *bus =
+		container_of(work, struct mei_device, bus_rescan_work);
+	struct mei_me_client *me_cl;
+
+	mutex_lock(&bus->device_lock);
+	me_cl = mei_me_cl_by_uuid(bus, &mei_amthif_guid);
+	if (me_cl)
+		mei_amthif_host_init(bus, me_cl);
+	mei_me_cl_put(me_cl);
+	mutex_unlock(&bus->device_lock);
+
+	mei_cl_bus_rescan(bus);
 }
 
 int __mei_cldev_driver_register(struct mei_cl_driver *cldrv,

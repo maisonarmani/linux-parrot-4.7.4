@@ -26,6 +26,7 @@
 #include <linux/sizes.h>
 #include <linux/device.h>
 #include <linux/dma-contiguous.h>
+#include <linux/decompress/generic.h>
 
 #include <asm/addrspace.h>
 #include <asm/bootinfo.h>
@@ -250,6 +251,35 @@ disable:
 	return 0;
 }
 
+/* In some conditions (e.g. big endian bootloader with a little endian
+   kernel), the initrd might appear byte swapped.  Try to detect this and
+   byte swap it if needed.  */
+static void __init maybe_bswap_initrd(void)
+{
+#if defined(CONFIG_CPU_CAVIUM_OCTEON)
+	u64 buf;
+
+	/* Check for CPIO signature */
+	if (!memcmp((void *)initrd_start, "070701", 6))
+		return;
+
+	/* Check for compressed initrd */
+	if (decompress_method((unsigned char *)initrd_start, 8, NULL))
+		return;
+
+	/* Try again with a byte swapped header */
+	buf = swab64p((u64 *)initrd_start);
+	if (!memcmp(&buf, "070701", 6) ||
+	    decompress_method((unsigned char *)(&buf), 8, NULL)) {
+		unsigned long i;
+
+		pr_info("Byteswapped initrd detected\n");
+		for (i = initrd_start; i < ALIGN(initrd_end, 8); i += 8)
+			swab64s((u64 *)i);
+	}
+#endif
+}
+
 static void __init finalize_initrd(void)
 {
 	unsigned long size = initrd_end - initrd_start;
@@ -262,6 +292,8 @@ static void __init finalize_initrd(void)
 		printk(KERN_ERR "Initrd extends beyond end of memory");
 		goto disable;
 	}
+
+	maybe_bswap_initrd();
 
 	reserve_bootmem(__pa(initrd_start), size, BOOTMEM_DEFAULT);
 	initrd_below_start_ok = 1;
@@ -706,6 +738,9 @@ static void __init arch_mem_init(char **cmdline_p)
 	for_each_memblock(reserved, reg)
 		if (reg->size != 0)
 			reserve_bootmem(reg->base, reg->size, BOOTMEM_DEFAULT);
+
+	reserve_bootmem_region(__pa_symbol(&__nosave_begin),
+			__pa_symbol(&__nosave_end)); /* Reserve for hibernation */
 }
 
 static void __init resource_init(void)
@@ -732,21 +767,23 @@ static void __init resource_init(void)
 			end = HIGHMEM_START - 1;
 
 		res = alloc_bootmem(sizeof(struct resource));
+
+		res->start = start;
+		res->end = end;
+		res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
+
 		switch (boot_mem_map.map[i].type) {
 		case BOOT_MEM_RAM:
 		case BOOT_MEM_INIT_RAM:
 		case BOOT_MEM_ROM_DATA:
 			res->name = "System RAM";
+			res->flags |= IORESOURCE_SYSRAM;
 			break;
 		case BOOT_MEM_RESERVED:
 		default:
 			res->name = "reserved";
 		}
 
-		res->start = start;
-		res->end = end;
-
-		res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
 		request_resource(&iomem_resource, res);
 
 		/*

@@ -1963,7 +1963,7 @@ static int keyspan_usa49_send_setup(struct usb_serial *serial,
 	if (d_details->product_id == keyspan_usa49wg_product_id) {
 		dr = (void *)(s_priv->ctrl_buf);
 		dr->bRequestType = USB_TYPE_VENDOR | USB_DIR_OUT;
-		dr->bRequest = 0xB0;	/* 49wg control message */;
+		dr->bRequest = 0xB0;	/* 49wg control message */
 		dr->wValue = 0;
 		dr->wIndex = 0;
 		dr->wLength = cpu_to_le16(sizeof(msg));
@@ -2375,6 +2375,10 @@ static void keyspan_release(struct usb_serial *serial)
 	struct keyspan_serial_private *s_priv;
 
 	s_priv = usb_get_serial_data(serial);
+
+	/* Make sure to unlink the URBs submitted in attach. */
+	usb_kill_urb(s_priv->instat_urb);
+	usb_kill_urb(s_priv->indat_urb);
 
 	usb_free_urb(s_priv->instat_urb);
 	usb_free_urb(s_priv->indat_urb);

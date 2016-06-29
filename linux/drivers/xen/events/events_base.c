@@ -26,7 +26,7 @@
 #include <linux/linkage.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
-#include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/string.h>
 #include <linux/bootmem.h>
 #include <linux/slab.h>
@@ -487,7 +487,8 @@ static void eoi_pirq(struct irq_data *data)
 	if (!VALID_EVTCHN(evtchn))
 		return;
 
-	if (unlikely(irqd_is_setaffinity_pending(data))) {
+	if (unlikely(irqd_is_setaffinity_pending(data)) &&
+	    likely(!irqd_irq_disabled(data))) {
 		int masked = test_and_set_mask(evtchn);
 
 		clear_evtchn(evtchn);
@@ -1370,7 +1371,8 @@ static void ack_dynirq(struct irq_data *data)
 	if (!VALID_EVTCHN(evtchn))
 		return;
 
-	if (unlikely(irqd_is_setaffinity_pending(data))) {
+	if (unlikely(irqd_is_setaffinity_pending(data)) &&
+	    likely(!irqd_irq_disabled(data))) {
 		int masked = test_and_set_mask(evtchn);
 
 		clear_evtchn(evtchn);

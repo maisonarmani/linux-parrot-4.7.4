@@ -12,19 +12,14 @@
 #include <asm/syscall.h>
 #include <asm/alternative.h>
 
-#define __SYSCALL_COMMON(nr, sym, compat) __SYSCALL_64(nr, sym, compat)
+#define __SYSCALL_64_QUAL_(sym) sym
+#define __SYSCALL_64_QUAL_ptregs(sym) ptregs_##sym
 
-#ifdef CONFIG_X86_X32_ABI
-# define __SYSCALL_X32(nr, sym, compat) __SYSCALL_64(nr, sym, compat)
-#else
-# define __SYSCALL_X32(nr, sym, compat) /* nothing */
-#endif
-
-#define __SYSCALL_64(nr, sym, compat) extern asmlinkage long sym(unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long) ;
+#define __SYSCALL_64(nr, sym, qual) extern asmlinkage long __SYSCALL_64_QUAL_##qual(sym)(unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long);
 #include <asm/syscalls_64.h>
 #undef __SYSCALL_64
 
-#define __SYSCALL_64(nr, sym, compat) [nr] = sym,
+#define __SYSCALL_64(nr, sym, qual) [nr] = __SYSCALL_64_QUAL_##qual(sym),
 
 extern long sys_ni_syscall(unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long);
 
@@ -45,19 +40,15 @@ bool x32_enabled = !IS_ENABLED(CONFIG_X86_X32_DISABLED);
 module_param_named(x32, x32_enabled, bool, 0444);
 
 extern char system_call_fast_compare_end[], system_call_fast_compare[],
-	system_call_trace_compare_end[], system_call_trace_compare[],
 	system_call_mask_compare_end[], system_call_mask_compare[];
 
 static int __init x32_enable(void)
 {
 	BUG_ON(system_call_fast_compare_end - system_call_fast_compare != 10);
-	BUG_ON(system_call_trace_compare_end - system_call_trace_compare != 10);
 	BUG_ON(system_call_mask_compare_end - system_call_mask_compare != 10);
 
 	if (x32_enabled) {
 		text_poke_early(system_call_fast_compare,
-				system_call_mask_compare, 10);
-		text_poke_early(system_call_trace_compare,
 				system_call_mask_compare, 10);
 #ifdef CONFIG_X86_X32_DISABLED
 		pr_info("Enabled x32 syscalls\n");
