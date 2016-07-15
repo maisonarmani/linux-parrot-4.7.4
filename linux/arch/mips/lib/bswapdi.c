@@ -1,5 +1,10 @@
 #include <linux/module.h>
 
+#ifdef __GENKSYMS__
+#undef notrace
+#define notrace
+#endif
+
 unsigned long long notrace __bswapdi2(unsigned long long u)
 {
 	return (((u) & 0xff00000000000000ull) >> 56) |

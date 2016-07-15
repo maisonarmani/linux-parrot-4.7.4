@@ -1,0 +1,4 @@
+ dpkg-buildpackage -rfakeroot -D -us -uc distclean
+dpkg-buildpackage: error: unknown option or argument distclean
+
+Use --help for program usage information.

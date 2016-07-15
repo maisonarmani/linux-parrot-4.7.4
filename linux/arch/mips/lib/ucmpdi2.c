@@ -2,6 +2,11 @@
 
 #include "libgcc.h"
 
+#ifdef __GENKSYMS__
+#undef notrace
+#define notrace
+#endif
+
 word_type notrace __ucmpdi2(unsigned long long a, unsigned long long b)
 {
 	const DWunion au = {.ll = a};
