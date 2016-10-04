@@ -2,11 +2,6 @@
 
 #include "libgcc.h"
 
-#ifdef __GENKSYMS__
-#undef notrace
-#define notrace
-#endif
-
 long long notrace __lshrdi3(long long u, word_type b)
 {
 	DWunion uu, w;

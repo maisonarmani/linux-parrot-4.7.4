@@ -10,7 +10,7 @@
 #include <linux/init.h>
 #include <asm/asm-offsets.h>
 #include <asm/syscall.h>
-#include <asm/alternative.h>
+#include <asm/text-patching.h>
 
 #define __SYSCALL_64_QUAL_(sym) sym
 #define __SYSCALL_64_QUAL_ptregs(sym) ptregs_##sym

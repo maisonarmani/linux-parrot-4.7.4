@@ -465,7 +465,6 @@ static int vmw_stdu_bind_fb(struct vmw_private *dev_priv,
 			return ret;
 		}
 	} else if (new_content_type == SAME_AS_DISPLAY) {
-		new_vfbs = vmw_framebuffer_to_vfbs(new_fb);
 		new_display_srf = vmw_surface_reference(new_vfbs->surface);
 	}
 
