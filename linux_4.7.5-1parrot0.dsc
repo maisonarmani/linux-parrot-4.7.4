@@ -920,10 +920,10 @@ Package-List:
  zlib-modules-4.7.0-parrot-versatile-di udeb debian-installer extra arch=armel profile=!stage1
 Checksums-Sha1:
  9befc77b1333ea3b742c6ceb76f4d4edce572938 91657048 linux_4.7.5.orig.tar.xz
- 33b387e00d4c78792a8f87ae98293c4ab6be4a1d 2725628 linux_4.7.5-1parrot0.debian.tar.xz
+ a041fec2d62235f24c083d14976b6ccffa079b5e 2724660 linux_4.7.5-1parrot0.debian.tar.xz
 Checksums-Sha256:
  6534832a4d9d91ece390e957ffdb86a8f4dde89791cfe351626c820535d4c0b6 91657048 linux_4.7.5.orig.tar.xz
- 4393f45792779a84e3588a641985d29bf4a5d0ba245128fdb27a7c704cda97d7 2725628 linux_4.7.5-1parrot0.debian.tar.xz
+ c9fd83ff47a1c4f52e3307737efd9fb5a17583b539b3286e70d70acc58fa9053 2724660 linux_4.7.5-1parrot0.debian.tar.xz
 Files:
  3a8edc7542a5eb6e464725930572e497 91657048 linux_4.7.5.orig.tar.xz
- 5511983b334032d64e7d380fa4310c8a 2725628 linux_4.7.5-1parrot0.debian.tar.xz
+ dc3114c208b52e6e8196370cd81f83c4 2724660 linux_4.7.5-1parrot0.debian.tar.xz
