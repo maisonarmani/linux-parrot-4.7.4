@@ -1,0 +1,11 @@
+ dpkg-buildpackage -rfakeroot -D -us -uc
+dpkg-buildpackage: source package linux
+dpkg-buildpackage: source version 4.7.6-1parrot0
+dpkg-buildpackage: source distribution testing
+dpkg-buildpackage: source changed by <palinuro@ve1137.venus.dedi.server-hosting.expert>
+ dpkg-source --before-build linux
+dpkg-buildpackage: host architecture amd64
+dpkg-source: info: using options from linux/debian/source/options: --compression=xz --tar-ignore=debian/*.local
+dpkg-checkbuilddeps: Unmet build dependencies: kernel-wedge (>= 2.93~) libssl-dev:native asciidoc bison flex:native gcc-multilib libaudit-dev libdw-dev libelf-dev libiberty-dev libnewt-dev libnuma-dev libperl-dev libunwind8-dev python-dev autoconf automake libtool libglib2.0-dev libudev-dev libwrap0-dev libpci-dev dh-systemd gcc-5
+dpkg-buildpackage: warning: build dependencies/conflicts unsatisfied; aborting
+dpkg-buildpackage: warning: (Use -d flag to override.)
